@@ -6,13 +6,14 @@ use vars qw($VERSION);
 
 use SOAP::Lite;
 
-$VERSION = 0.10;
+$VERSION = 0.02;
 
 sub new {
   my $type = shift;
   my $self = {};
   my %params = @_;
-  my $uri = "http://$params{server}:$params{port}/";
+  my $protocol = $params{ssl} ? 'https' : 'http';
+  my $uri = "$protocol://$params{server}:$params{port}/";
   my $proxy = "$uri$\?session=$params{session}";
   my $remote = SOAP::Lite -> uri($uri) -> proxy($proxy);
   die("Couldn't connect to server $uri") unless $remote;

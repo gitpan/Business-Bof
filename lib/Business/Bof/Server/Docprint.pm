@@ -3,7 +3,7 @@ package Business::Bof::Server::Docprint;
 use strict;
 
 use File::stat;
-use Printer;
+## use Printer;
 
 sub new {
   my ($type, $serverSettings) = @_;
@@ -18,8 +18,8 @@ sub printFile {
   my $file = $values->{file} if defined($values->{file});
   my $queue = $values->{queue} if defined($values->{queue});
   my $type = $values->{type} || 'print';
-  my $prn = new Printer();
-  $prn->use_default;
+ ## my $prn = new Printer();
+ ## $prn->use_default;
   my $outDir = "$self->{domdir}/$self->{domain}/doc/";
   my $prnFiles;
   if ($file) {
@@ -106,3 +106,72 @@ sub _getQueuelist {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Business::Bof::Server::Docprint -- Handles printing of documents
+
+=head1 SYNOPSIS
+
+  use Business::Bof::Server::Docprint
+
+  my $prt = new Business::Bof::Server::Docprint($serverSettings);
+
+  my $result = $prt -> printFile($data, $userInfo);
+  ...
+
+=head1 DESCRIPTION
+
+Business::Bof::Server::Docprint handles the job of administrating the
+printing of documenents for BOF. It is not meant to be called directly,
+only from Business::Bof::Server::CLI, which will be the user's primary
+interface to printing.
+
+=head2 Methods
+
+Docprint has four methods:
+
+=over 4
+
+=item printFile
+
+Prints a file according to the provided data
+
+$data = {
+  type => 'doc' or 'print',
+  file => $filename,
+  queue => $queuename
+};
+
+$result = $prt -> printFile($data, $userInfo);
+
+User applications are expected to print to the doc directory. Docprint
+will find the file there or in the print directory and print it. It will
+move any printed file from the doc to the print directory.
+You can have any number of queues.
+
+=item getFile
+
+Returns the requested file.
+
+my $result = $prt -> getFile($data, $userInfo);
+
+=item getPrintfilelist
+
+Returns a list of files in either the doc or the print directory.
+
+my $result = $prt -> getFilelist($data, $userInfo);
+
+=item getQueuelist
+
+Returns a list of queues in the doc or the print directory.
+
+my $result = $prt -> getQueuelist($data, $userInfo);
+
+=back
+
+=head1 AUTHOR
+
+Kaare Rasmussen <kar at kakidata.dk>

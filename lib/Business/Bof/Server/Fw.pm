@@ -8,7 +8,7 @@ use DBIx::Recordset;
 use XML::Dumper;
 use Digest::MD5 qw(md5_base64);
 
-$VERSION = 0.10;
+$VERSION = 0.02;
 
 sub new {
   my ($type, $conffile) = @_;
@@ -55,7 +55,7 @@ sub getdb {
   my $schema = $data{userinfo}{dbschema};
   my $db = DBI->connect("dbi:Pg:dbname=$dbname;host=$host", "$username", "$password")
       or die("Unable to connect to $dbname");
-  $db -> do ("SET search_path TO $schema");
+  $db -> do ("SET search_path TO $schema, public");
   return $db;
 }
 
@@ -75,7 +75,7 @@ sub getUserinfo {
   my $set = DBIx::Recordset -> Search ({%ndat,
     ('!DataSource'   => $db,
     '!Fields' => 'user_id, dbname, fw_usergroup.name AS groupname, 
-      dbusername, dbpassword, dbhost, dbschema, contact_id, domainname',
+      dbusername, dbpassword, dbhost, dbschema, domainname',
     '!Table' => 'fw_user, fw_usergroup, fw_useringroup, fw_database',
     '!TabJoin' => 'fw_usergroup LEFT JOIN fw_useringroup USING (usergroup_id)
        LEFT JOIN fw_user USING (user_id)
@@ -215,3 +215,76 @@ sub getAllowed {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Business::Bof::Server::Fw -- Framework support for CLI and utility methods
+
+=head1 DESCRIPTION
+
+Business::Bof::Server::Fw is an interface to BOF's Framework Database.
+It also provides a few utility methods.
+
+=head2 Methods
+
+Fw has these methods:
+
+=over 4
+
+=item getNewSessionid
+
+Returns a session ID to be used all throughout the client's session.
+
+=item newFwdb
+
+Returns a new handle to the Framework Database.
+
+=item getFwdb
+
+Returns the current handle to the Framework Database.
+
+=item getdb
+
+Returns a handle to the application's database.
+
+=item getUserinfo
+
+Returns the User Information from the Framework Database given the login
+information 
+
+my $data = {
+  name => $username,
+  password => $password
+}
+my %userinfo = $fw -> getUserinfo( $data );
+
+=item getMenu
+
+Returns an array containing the menus from the Framework Database.
+
+=item getAllowed
+
+Returns an array containing the allowed menu items.
+
+=item getServerConfig
+
+Returns the Server's Configuration (as provided in the configuration XML
+file).
+
+=item getServerSettings
+
+Returns the Server's Server Settings (as provided in the configuration
+XML file).
+
+=item getClientSettings
+
+Returns the Server's Client Settings (as provided in the configuration
+XML file).
+
+=back
+
+=head1 AUTHOR
+
+Kaare Rasmussen <kar at kakidata.dk>

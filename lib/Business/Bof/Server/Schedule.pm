@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = 0.10;
+$VERSION = 0.02;
 
 use DBIx::Recordset;
 use XML::Dumper;

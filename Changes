@@ -1,0 +1,8 @@
+2005-03-21   Kaare Rasmussen <kar at kakidata dot dk>
+
+    Release 0.02
+
+    Removed Business::Bof::Utility::ReportWriter and turned it into
+    separate Business::ReportWriter instead.
+
+    Added SSL to the server. It can now be used on insecure lines.

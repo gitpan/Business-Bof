@@ -1,6 +1,5 @@
-Business::Bof 0.01
+Business::Bof 0.02
 =================================
-
 
 INSTALLATION
 
@@ -11,10 +10,33 @@ To install this module type the following:
    perl Build test
    perl Build install
 
+SSL
+
+A couple of notes about SSL (introduced in Bof 0.02).
+
+You need two keys to certify your server. If you want to use self signed
+certificates, you should be able to create them with something like
+this:
+
+openssl req -new -nodes -x509 -out cert.pem -keyout key.pem -days 365 \
+   -subj "/C=US/ST=CO/L=City/CN=localhost/emailAddress=root@localhost"
+
+One problem I encountered with SSL had nothing to do with the server,
+but rather was hidden deep inside SOAP::Lite. The "500 Can't locate
+object method "new" via package "LWP::Protocol::https::Socket" wasn't
+the most helpful one.
+
+The problem turned out to be two missing modules:
+
+Net::SSL and
+IO::Socket::SSL
+
+Perhaps SOAP::Lite recommends them, but they're not required.
+
 
 LICENSE
 
-Business::Bof is copyright (c) 2004 Kaare Rasmussen 
+Business::Bof is copyright (c) 2004-2005 Kaare Rasmussen 
 (kar at kakidata dot)
 
 This module is free software; you can redistribute it and/or modify it

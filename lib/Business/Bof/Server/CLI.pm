@@ -19,7 +19,7 @@ use Business::Bof::Server::Docprint;
 
 use vars qw($VERSION @EXPORT @ISA);
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 @ISA = qw(Exporter);
 @EXPORT = qw(run);
 
@@ -42,12 +42,21 @@ sub init {
     "$conf->{home}/etc/log.conf",
     $conf->{logCheck}); # Check conf every x seconds
   $logger->info("Started $conf->{application} Server");
-
+  my %newparms = (
+    'ALIAS'      => $conf->{name},
+    'ADDRESS'    => $conf->{host},
+    'PORT'       => $conf->{port},
+    'HOSTNAME'   => $conf->{hostname}
+  );
+  if (defined($conf->{SSL})) {
+    my $publicKey =  $conf->{home} . '/' . $conf->{SSL}{PUBLICKEY};
+    my $publicCert = $conf->{home} . '/' . $conf->{SSL}{PUBLICCERT};
+    $newparms{SIMPLEHTTP} = {
+      'SSLKEYCERT' => [ $publicKey, $publicCert ]
+    }
+  };
   POE::Component::Server::SOAP->new(
-      'ALIAS'    => $conf->{name},
-      'ADDRESS'  => $conf->{host},
-      'PORT'     => $conf->{port},
-      'HOSTNAME' => $conf->{hostname},
+    %newparms
   );
   POE::Session->create
     ( inline_states =>
