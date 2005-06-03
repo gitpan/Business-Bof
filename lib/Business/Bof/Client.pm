@@ -2,23 +2,23 @@ package Business::Bof::Client;
 
 use warnings;
 use strict;
-use vars qw($VERSION);
-
+use Scalar::Util qw(blessed refaddr);
 use SOAP::Lite;
 
-$VERSION = 0.02;
+our $VERSION = 0.03;
 
 sub new {
-  my $type = shift;
+  my ($type, $params) = @_;
   my $self = {};
-  my %params = @_;
-  my $protocol = $params{ssl} ? 'https' : 'http';
-  my $uri = "$protocol://$params{server}:$params{port}/";
-  my $proxy = "$uri$\?session=$params{session}";
+  my $protocol = $params->{ssl} ? 'https' : 'http';
+  my $uri = "$protocol://$params->{server}:$params->{port}/";
+  my $proxy = "$uri\?session=$params->{session}";
   my $remote = SOAP::Lite -> uri($uri) -> proxy($proxy);
   die("Couldn't connect to server $uri") unless $remote;
   $self->{remote} = $remote;
-  return bless $self,$type;
+  my $class = bless $self,$type;
+  my $res = $class->setup_class('Business::Bof::Server::Connection');
+  return $class;
 }
 
 sub disconnect {
@@ -27,129 +27,137 @@ sub disconnect {
   $remote->disconnect;
 }
 
-sub ping {
-  my $self = shift;
-  my $remote = $self->{remote};
-  return $remote->ping;
-}
-
-sub setSessionId {
-  my ($self, $sessionId) = @_;
-  $self->{SOAPsessionId} = SOAP::Data->name(sessionId => $sessionId);
-}
-
 sub login {
-  my ($self, $logInfo) = @_;
-  my $remote = $self->{remote};
-  my $sessionId = $remote->login($logInfo)->result;
-  $self -> setSessionId($sessionId);
-  return $sessionId;
+  my ($self, $log_info) = @_;
+  my $session_id = Business::Bof::Server::Connection::login($log_info);
+  $self->{session_id} = $session_id;
+  $self->{SOAPsessionId} = SOAP::Data->name(sessionId => $session_id);
+  return $session_id;
 }
 
 sub logout {
   my $self = shift;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $res = $remote->logout($sessionId)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::logout($session_id);
 }
 
-sub getClientdata {
+sub set_sessionid {
+  my ($self, $session_id) = @_;
+  $self->{session_id} = $session_id;
+  $self->{SOAPsessionId} = SOAP::Data->name(sessionId => $session_id);
+}
+
+sub get_clientdata {
   my $self = shift;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $res = $remote->getClientdata($sessionId)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_clientdata($session_id);
 }
 
-sub getData {
+sub get_data {
   my ($self, $parms) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPparms = SOAP::Data->name(parms => $parms);
-  my $res = $remote->getData($sessionId, $SOAPparms)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_data($session_id, $parms);
 }
 
-sub cacheData {
+sub cache_data {
   my ($self, $name, $data) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPname = SOAP::Data->name(name => $name);
-  my $SOAPdata = SOAP::Data->name(data => $data);
-  my $res = $remote->cacheData($sessionId, $SOAPname, $SOAPdata)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::cache_data($session_id, $name, $data);
 }
 
-sub getCachedata {
+sub get_cachedata {
   my ($self, $name) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPname = SOAP::Data->name(name => $name);
-  my $res = $remote->getCachedata($sessionId, $SOAPname)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_cachedata($session_id, $name);
 }
 
-sub getTask {
-  my ($self, $taskId) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPtaskId = SOAP::Data->name(taskId => $taskId);
-  my $res = $remote->getTask($sessionId, $SOAPtaskId)->result;
-  return $res;
+sub get_task {
+  my ($self, $task_id) = @_;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_task($session_id, $task_id);
 }
 
-sub getTasklist {
-  my ($self) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $res = $remote->getTasklist($sessionId)->result;
-  return $res;
+sub get_tasklist {
+  my $self = shift;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_tasklist($session_id);
 }
 
-sub printFile {
+sub print_file {
   my ($self, $data) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPdata = SOAP::Data->name(data => $data);
-  my $res = $remote->printFile($sessionId, $SOAPdata)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::print_file($session_id, $data);
 }
 
-sub getPrintfile {
+sub get_printfile {
   my ($self, $data) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPdata = SOAP::Data->name(data => $data);
-  my $res = $remote->getPrintfile($sessionId, $SOAPdata)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_printfile($session_id, $data);
 }
 
-sub getPrintfilelist {
+sub get_printfilelist {
   my ($self, $data) = @_;
-  my $sessionId = $self->{SOAPsessionId};
-  my $remote = $self->{remote};
-  my $SOAPdata = SOAP::Data->name(data => $data);
-  my $res = $remote->getPrintfilelist($sessionId, $SOAPdata)->result;
-  return $res;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_printfilelist($session_id, $data);
 }
 
-sub getQueuelist {
+sub get_queuelist {
   my ($self, $data) = @_;
-  my $sessionId = $self->{SOAPsessionId};
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::get_queuelist($session_id, $data);
+}
+
+sub call_method {
+  my ($self, $data) = @_;
+  my $session_id = $self->{session_id};
+  Business::Bof::Server::Connection::call_method($session_id, $data);
+}
+
+sub setup_class {
+  my ($self, $class, @package) = @_;
+  my $methods = $self->_get_allowed_methods($class, @package);
+  $self->_setup_class($class, %$methods);
+}
+
+sub _get_allowed_methods {
+  my ($self, $class, @package) = @_;
   my $remote = $self->{remote};
-  my $SOAPdata = SOAP::Data->name(data => $data);
-  my $res = $remote->getQueuelist($sessionId, $SOAPdata)->result;
+  my $session_id = SOAP::Data->name(sessionId => $self->{SOAPsessionId});
+  my $data = {class => $class, package => \@package};
+  my $SOAPparms = SOAP::Data->name(data => $data);
+  my $res = $remote->setupClass($session_id,$SOAPparms)->result;
   return $res;
 }
 
+sub _setup_class {
+  my ($self, $class, %methods) = @_;
+  my $file = $class;
+  $file =~ s/\:\:/\//g;
+  $INC{"${file}.pm"} = '**Bof**';
+  no strict qw/refs/;
+  foreach my $pkg (keys %methods) {
+    foreach my $meth (keys %{ $methods{$pkg} }) {
+      *{"${pkg}::${meth}"} = sub { $self->_soap_dispatch($pkg, $meth, @_) if $self; };
+    }
+  }
+}
 
-sub callMethod {
-  my ($self, $parms) = @_;
-  my $sessionId = $self->{SOAPsessionId};
+sub _soap_dispatch {
+  my ($self, $class, $meth, @parms) =  @_;
+  my $obj = shift(@parms) if blessed($parms[0]);
+  unshift(@parms, $obj->{obj}) if defined($obj);
   my $remote = $self->{remote};
-  my $SOAPparms = SOAP::Data->name(parms => $parms);
-  my $res = $remote->callMethod($sessionId, $SOAPparms)->result;
+  return if !$self->{remote};
+  my $session_id = SOAP::Data->name(sessionId => $self->{SOAPsessionId});
+  my $method = SOAP::Data->name(method => {class => $class, method => $meth});
+  my $SOAPparms = SOAP::Data->name(parms => \@parms);
+  my $res = $remote->execMethod($session_id,$method,$SOAPparms)->result;
+  if (ref($res) eq 'ARRAY' && ${$res}[0] =~ /__bof__/) {
+    my $h = {obj => $res};
+    my $cl = ${$res}[1];
+    bless $h, $cl;
+    $res = $h;
+  }
   return $res;
 }
 
@@ -162,13 +170,14 @@ Business::Bof::Client -- Client interface to Business Oriented Framework
 
 =head1 SYNOPSIS
 
+OBSOLETE!!
   use Business::Bof::Client;
 
   my $client = new Business::Bof::Client(server => localhost,
         port => 12345,
         session => myserver
   );
-  my $sessionId = $client->login({
+  my $session_id = $client->login({
     name => $username,
     password => $password
   });
@@ -183,6 +192,7 @@ Business::Bof::Client -- Client interface to Business Oriented Framework
   $result = $client -> getData($parms);
   $showresult = Dumper($result);
   print "getData: $showresult\n";
+OBSOLETE!!
 
 =head1 DESCRIPTION
 
@@ -199,7 +209,7 @@ making SOAP programming unnecessary.
 Instantiates a new client and performs a connection to the server with
 the information given. Will fail if no server is active at that address.
 
-=item $sessionId = $obj -> login({name => $username, password => $password});
+=item $session_id = $obj -> login({name => $username, password => $password});
 
 Creates a session in the server and returns an ID. This ID is for the
 pleasure of the user only.
@@ -210,7 +220,13 @@ I<name> and I<password> must be a valid pair in the Framework Database.
 
 Will terminate the session in the server and delete all working data.
 
-=item $obj -> getClientdata()
+=item $obj->setup_class($class);
+
+Will expose the $class to the client program. Methods from this class will
+be executed on the server.
+... more
+
+=item $obj -> get_clientdata()
 
 Returns a hash ref with 
 
@@ -219,7 +235,7 @@ C<ClientSettings>.
 
 b) Some data from the current session to be used by the client.
 
-=item $obj -> getData($parms);
+=item $obj -> get_data($parms);
 
 The purpose of getData is to request a set of data from the server. The
 format of the request is the same as is used by DBIx::Recordset. E.g.:
@@ -231,7 +247,14 @@ format of the request is the same as is used by DBIx::Recordset. E.g.:
     '$values'  =>  [ $ordernr ]
   };
 
-=item $obj -> cacheData($cachename, $somedata);
+=item $obj -> set_sessionid($session_id)
+
+Remind Business::Bof::Client of which session_id it should use.
+
+set_sessionid, cache_Data and get_cachedata are all primarily meant for 
+stateless environments, id. web development.
+
+=item $obj -> cache_data($cachename, $somedata);
 
 cacheData will let the server save some data for the client. It is
 very useful in a web environment, where the client is stateless. E.g.:
@@ -240,25 +263,25 @@ my $data = {
   foo => 'bar',
   this => 'that'
 };
-$obj -> cacheData('some data', $data);
+$obj -> cache_data('some data', $data);
 
-=item $obj -> getCachedata($cachename);
+=item $obj -> get_cachedata($cachename);
 
-getCachedata retrieves the cached data, given the right key. E.g.:
+get_cachedata retrieves the cached data, given the right key. E.g.:
 
-$thedata = $obj -> getCachedata('some data');
+$thedata = $obj -> get_cachedata('some data');
 
-=item $obj -> getTask($sessionId, $taskId);
+=item $obj -> get_task($session_id, $taskId);
 
 The server returns the task with the given taskId.
 
-=item $obj -> getTasklist($sessionId);
+=item $obj -> get_tasklist($session_id);
 
 The server returns the list of tasks.
 
-=item $obj -> printFile
+=item $obj -> print_file
 
-printFile will print a file from Bof's queue system. The given parameter
+print_file will print a file from Bof's queue system. The given parameter
 indicates which file is to be printed.
 
 It looks like this:
@@ -269,14 +292,14 @@ C<< $parms = {
   queue => $queuename
 }; >>
 
-=item $obj -> getPrintfile
+=item $obj -> get_printfile
 
-getPrintfile works like printFile, exept it returns the file instead of
+get_printfile works like printFile, exept it returns the file instead of
 printing it.
 
-=item $obj -> getPrintfilelist
+=item $obj -> get_printfilelist
 
-getPrintfilelist returns an array containing information about the files
+get_printfilelist returns an array containing information about the files
 in the chosen queue
 
 C<< $parms = {
@@ -286,7 +309,7 @@ C<< $parms = {
 
 =item $obj -> getQueuelist
 
-getQueuelist returns an array containing information about the available
+get_queuelist returns an array containing information about the available
 queues.
 
 C<< $parms = {
@@ -294,7 +317,7 @@ C<< $parms = {
 }; >>
 
 
-=item $obj -> callMethod
+=item $obj -> call_method
 
 The main portion of the client call will be callMethod. It will find the
 class and method, produce a new instant and execute it with the given
@@ -310,7 +333,7 @@ $parms = {
   task => 1 ]
 };
 
-$res = $obj -> callMethod($parms);
+$res = $obj -> call_method($parms);
  
 Two modifiers will help the server determine what to do with the call.
 
@@ -326,4 +349,3 @@ execute it later depending on the server's configuration settings.
 =head1 AUTHOR
 
 Kaare Rasmussen <kar at kakidata.dk>
-

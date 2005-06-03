@@ -1,4 +1,4 @@
-  package Business::Bof::Data::Fw;
+package Business::Bof::Data::Fw;
   use base 'Class::DBI';
 
 package Business::Bof::Data::Fw::fw_database;
@@ -7,6 +7,7 @@ package Business::Bof::Data::Fw::fw_database;
   Business::Bof::Data::Fw::fw_database->table('fw_database');
   Business::Bof::Data::Fw::fw_database->columns(All => qw/
   	db_id
+	dbtype
 	dbname
 	dbusername
 	dbpassword
@@ -33,6 +34,19 @@ package Business::Bof::Data::Fw::fw_menu;
   Business::Bof::Data::Fw::fw_menu->has_many('fw_menulink_parent_id', PREFIX.'::fw_menulink' => 'menu_id');
   Business::Bof::Data::Fw::fw_menu->has_many('fw_menulink_child_id', PREFIX.'::fw_menulink' => 'menu_id');
   Business::Bof::Data::Fw::fw_menu->has_many('fw_usermenu_menu_id', PREFIX.'::fw_usermenu' => 'menu_id');
+
+  Business::Bof::Data::Fw::fw_menu->add_constructor(topmenu => qq{
+    menu_id NOT IN (SELECT child_id FROM fw_menulink)
+    AND menu_id NOT IN
+    (SELECT menu_id FROM fw_usermenu WHERE usergroup_id = ?)
+  });
+  Business::Bof::Data::Fw::fw_menu->set_sql(submenu => qq{
+    SELECT __ESSENTIAL__
+      FROM fw_menu JOIN fw_menulink
+      ON (fw_menu.menu_id = fw_menulink.child_id)
+      WHERE parent_id = ? AND fw_menu.menu_id NOT IN
+      (SELECT menu_id FROM fw_usermenu WHERE usergroup_id = ?)
+  });
 
 package Business::Bof::Data::Fw::fw_menulink;
   use constant PREFIX => "Business::Bof::Data::Fw";
@@ -67,6 +81,13 @@ package Business::Bof::Data::Fw::fw_schedule;
   Business::Bof::Data::Fw::fw_schedule->columns(Primary => 'schedule_id');
   Business::Bof::Data::Fw::fw_schedule->sequence('fw_schedulesequence');
   Business::Bof::Data::Fw::fw_schedule->has_a(user_id => PREFIX.'::fw_user');
+
+  Business::Bof::Data::Fw::fw_schedule->add_constructor(schedlist => qq{
+    schedtype = ?
+    AND ?::time >= schedule::time
+    AND (lastrun IS null OR date_trunc(?, lastrun) < ?)
+  });
+
 
 package Business::Bof::Data::Fw::fw_task;
   use constant PREFIX => "Business::Bof::Data::Fw";
@@ -105,7 +126,6 @@ package Business::Bof::Data::Fw::fw_user;
   	user_id
 	name
 	password
-	contact_id
 	updated
   /);
   Business::Bof::Data::Fw::fw_user->columns(Primary => 'user_id');

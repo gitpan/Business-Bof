@@ -2,116 +2,81 @@ package Business::Bof::Server::Task;
 
 use warnings;
 use strict;
-use vars qw($VERSION);
-
-$VERSION = 0.02;
-
-use DBIx::Recordset;
 use XML::Dumper;
 
+use Business::Bof::Data::Fw;
+
+our $VERSION = 0.02;
+
 sub new {
-  my ($type, $db) = @_;
+  my ($type) = @_;
   my $self = {};
-  $self->{db} = $db;
   return bless $self,$type;
 }
 
 sub newTask {
-  my $self = shift;
-  my %task = %{ shift() };
-  my $db = $self->{db};
+  my ($self, $values) = @_;
   my $parms;
-  if (defined $task{data}) {
-    $parms = pl2xml($task{data});
+  if (defined $values->{data}) {
+    $parms = pl2xml($values->{data});
   } else {
-    $parms = $task{parameters};
+    $parms = $values->{parameters};
   }
-  my %values = (
-    user_id => $task{user_id},
-    function => $task{function},
-    title => $task{title},
-    status => $task{status},
+  my $fwtask = Business::Bof::Data::Fw::fw_task->create({
+    user_id => $values->{user_id},
+    function => $values->{function},
+    title => $values->{title},
+    status => $values->{status},
     parameters => $parms
-  );
-  my $set = DBIx::Recordset -> Insert ({%values,
-     ('!DataSource'   => $db,
-      '!Table' => "fw_task",
-      '!Serial' => "task_id",
-      '!Sequence' => "fw_tasksequence"
-     )}
-   );
-  my $task_id = $$set -> LastSerial();
+  });
+  $fwtask->dbi_commit();
+  my $task_id = $fwtask->task_id;
 }
 
 sub updTask {
-  my $self = shift;
-  my %values = %{ shift() };
-  my $db = $self->{db};
-  my $set = DBIx::Recordset -> Update ({%values,
-     ('!DataSource'   => $db,
-      '!Table'   => 'fw_task',
-      '!PrimKey' =>  'task_id'
-     )}
-   );
+  my ($self, $values) = @_;
+  my $fwtask = Business::Bof::Data::Fw::fw_task->retrieve($values->{task_id});
+  $values->{parameters} = pl2xml($values->{data}) if defined $values->{data};
+  delete $values->{data};
+  $fwtask->set(%$values);
+  $fwtask->update();
+  $fwtask->dbi_commit();
 }
 
 sub getTask {
-  my $self = shift;
-  my $db = $self->{db};
-  my $ro;  # Read Only
-  my %values;
-  if (ref $_[0] eq 'HASH') {
-   %values = %{shift()};
-   $ro = $values{ro} if $values{ro};
-   undef $values{ro};
+  my ($self, $values) = @_;
+  my $ro = $values->{ro};
+  delete $values->{ro};
+  my @fwtask = Business::Bof::Data::Fw::fw_task->search(%$values)
+   or return;
+  my $fwtask = $fwtask[0];
+  if (!$ro) {
+    $fwtask->status(150);
+    $fwtask->update;
+    $fwtask->dbi_commit();
   }
-  my $set = DBIx::Recordset -> Search ({%values,
-    '!DataSource'   => $db,
-    '!Table' => 'fw_task',
-    '!Order' => 'task_id',
-    '!PrimKey' =>  'task_id'
-  });
-  my $retVal;
-  if (my $rec = $$set -> Next) {
-    if (!$ro) {
-      $values{status} = 150;
-      $values{task_id} = $rec->{task_id};
-      $self -> updTask(\%values);
-    }
-    my $parms = $rec->{parameters};
-    my $data = xml2pl($parms); 
-    $rec->{data} = $data;
-    my %r;
-    for my $k (keys %$rec) {
-      if ($k eq 'result') {
-        $r{$k} = xml2pl($rec->{$k})
-      } else {
-        $r{$k} = $rec->{$k};
-      }
-    };
-    $retVal = \%r;
-  }
-  return $retVal;
+  $fwtask->{data} = xml2pl($fwtask->parameters) if $fwtask->parameters;
+#  delete $fwtask->{parameters};
+  $fwtask->{result} = xml2pl($fwtask->result) if $fwtask->result;
+  return $fwtask;
 }
 
 sub getTasklist {
   my ($self, $userInfo) = @_;
   my $db = $self->{db};
-  my $set = DBIx::Recordset -> Search ({
-    '!DataSource'   => $db,
-    '!Fields' => 'task_id, title, status',
-    '!Table' => 'fw_task',
-    '!Order' => 'task_id DESC',
-    '$where' => 'user_id = ?',
-    '$values'  =>  [$userInfo->{user_id}],
-  });
-##    '$max' => 20
-  #return if !$$set -> MoreRecords;
-  my @return;
-  while (my $rec = $$set -> Next) {
-    push @return, { ( %$rec ) };
+  my @task = Business::Bof::Data::Fw::fw_task->search(
+    user_id => $userInfo->{user_id},
+    { order_by=>'task_id DESC' }
+  );
+  my @ret;
+  for my $task (@task) {
+    push @ret, {(
+      task_id => $task->task_id,
+      title => $task->title,
+      status => $task->status
+    )};
   }
-  \@return;
+  return \@ret;
 }
 
 1;

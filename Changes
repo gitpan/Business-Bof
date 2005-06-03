@@ -1,5 +1,14 @@
-2005-03-21   Kaare Rasmussen <kar at kakidata dot dk>
+2005-05-31   Kaare Rasmussen <kar at kakidata dot dk>
 
+    Release 0.03
+
+    Introduced a real Remote Object Executor.
+    Added framework support for SQLite.
+    Made session database agnostic.
+    Framework database uses Class::DBI.
+    Refactored Server into CLI, Connection and Session modules.
+
+2005-03-21
     Release 0.02
 
     Removed Business::Bof::Utility::ReportWriter and turned it into

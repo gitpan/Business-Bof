@@ -1,25 +1,27 @@
 ---
 name: Business-Bof
-version: 0.02
+version: 0.03
 author:
   - Kaare Rasmussen <kar at kakidata.dk>
 abstract: A Framework for Business Oriented Tasks
 license: perl
 requires:
   Class::DBI: x
+  DBD::SQLite: 0
   DateTime: 0.22
   Digest::MD5: 2.33
   LWP::Protocol::https: 0
   Log::Log4perl: 0.47
   POE: 0.29
   POE::Component::Server::SOAP: 1.05
+  Printer: 0
   SOAP::Lite: 0.60
   XML::Dumper: 0.71
   perl: 5.8.3
 provides:
   Business::Bof::Client:
     file: lib/Business/Bof/Client.pm
-    version: 0.02
+    version: 0.03
   Business::Bof::Data::Fw:
     file: lib/Business/Bof/Data/Fw.pm
   Business::Bof::Data::Fw::fw_database:
@@ -44,16 +46,23 @@ provides:
     file: lib/Business/Bof/Data/Fw.pm
   Business::Bof::Server::CLI:
     file: lib/Business/Bof/Server/CLI.pm
-    version: 0.02
+    version: 0.03
+  Business::Bof::Server::Connection:
+    file: lib/Business/Bof/Server/Connection.pm
+    version: 0.03
   Business::Bof::Server::Docprint:
     file: lib/Business/Bof/Server/Docprint.pm
+    version: 0.03
   Business::Bof::Server::Fw:
     file: lib/Business/Bof/Server/Fw.pm
-    version: 0.02
+    version: 0.03
   Business::Bof::Server::Schedule:
     file: lib/Business/Bof/Server/Schedule.pm
     version: 0.02
+  Business::Bof::Server::Session:
+    file: lib/Business/Bof/Server/Session.pm
+    version: 0.03
   Business::Bof::Server::Task:
     file: lib/Business/Bof/Server/Task.pm
     version: 0.02
-generated_by: Module::Build version 0.2609
+generated_by: Module::Build version 0.261

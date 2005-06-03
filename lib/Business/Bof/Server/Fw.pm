@@ -2,177 +2,120 @@ package Business::Bof::Server::Fw;
 
 use warnings;
 use strict;
-use vars qw($VERSION);
-
-use DBIx::Recordset;
+use Carp;
 use XML::Dumper;
 use Digest::MD5 qw(md5_base64);
 
-$VERSION = 0.02;
+use Business::Bof::Data::Fw;
+
+our $VERSION = 0.03;
 
 sub new {
   my ($type, $conffile) = @_;
   my $self = {};
   $self->{config} = xml2pl($conffile);
-  return bless $self,$type;
+  my $class = bless $self,$type;
+  $class->new_fwdb;
+  return $class;
 }
 
-sub getNewSessionid {
+sub get_newsessionid {
   my $self = shift;
   return md5_base64(join ("", (@_, localtime())));
 }
 
-# Get a new handle to the Framework database
-sub newFwdb {
+sub new_fwdb {
   my $self = shift;
+  my $dbtype = $self->{config}{fwdb}{type};
   my $dbname = $self->{config}{fwdb}{name};
   my $username = $self->{config}{fwdb}{username};
   my $password = $self->{config}{fwdb}{password};
   my $host = $self->{config}{fwdb}{host};
-  my @connect = ("dbi:Pg:dbname=$dbname;host=$host");
+  my @connect = ("dbi:$dbtype:dbname=$dbname;host=$host");
   $connect[++$#connect] = $username if $username; 
   $connect[++$#connect] = $password if $password; 
-  my $fwdb = DBI->connect(@connect)
-    or die("Unable to connect to $dbname");
-  $self->{db} = $fwdb;
-  return $fwdb;
+  Business::Bof::Data::Fw->connection(@connect)
+    or croak("Unable to connect to $dbname");
+  return;
 }
 
-# Get the current handle to the Framework database
-sub getFwdb {
-  my $self = shift;
-  return $self->{db};
-}
-
-# Get a handle to the application's database
 sub getdb {
   my $self = shift;
   my %data = %{ shift() };
+  my $dbtype = $data{userinfo}{dbtype};
   my $dbname = $data{userinfo}{dbname};
   my $username = $data{userinfo}{dbusername};
   my $password = $data{userinfo}{password};
   my $host = $data{userinfo}{host};
   my $schema = $data{userinfo}{dbschema};
-  my $db = DBI->connect("dbi:Pg:dbname=$dbname;host=$host", "$username", "$password")
-      or die("Unable to connect to $dbname");
-  $db -> do ("SET search_path TO $schema, public");
+  my $db = DBI->connect("dbi:$dbtype:dbname=$dbname;host=$host",
+    "$username",
+    "$password"
+  ) or die("Unable to connect to $dbname");
+  $db -> do ("SET search_path TO $schema, public") if $schema;
   return $db;
 }
 
-sub getUserinfo {
-  my $self = shift;
-  my %data = %{ shift() };
-  my %ndat;
-  $ndat{'fw_user.name'} = $data{name} if $data{name};
-  $ndat{'fw_user.password'} = $data{password} if $data{password};
-# To prevent reading user info by user_id:
-#  $ndat{'fw_user.name'} = $data{name} || '*';
-#  $ndat{'fw_user.password'} = $data{password} || '*';
-  $ndat{'fw_user.user_id'} = $data{user_id} if $data{user_id};
-  my $db = $self->{db};
-  my %userinfo;
-#$DBIx::Recordset::Debug = 4;
-  my $set = DBIx::Recordset -> Search ({%ndat,
-    ('!DataSource'   => $db,
-    '!Fields' => 'user_id, dbname, fw_usergroup.name AS groupname, 
-      dbusername, dbpassword, dbhost, dbschema, domainname',
-    '!Table' => 'fw_user, fw_usergroup, fw_useringroup, fw_database',
-    '!TabJoin' => 'fw_usergroup LEFT JOIN fw_useringroup USING (usergroup_id)
-       LEFT JOIN fw_user USING (user_id)
-       LEFT JOIN fw_database USING (db_id)'
-    )});
-  if (my $rec = $$set -> Next) {
-#    my $now = DateTime->now();
-    %userinfo = (
-     user_id => $rec->{user_id},
-     dbname => $rec->{dbname},
-     name => $rec->{groupname},
-     dbusername => $rec->{dbusername},
-     dbschema => $rec->{dbschema},
-     password => $rec->{dbpassword},
-     host => $rec->{dbhost},
-     owner_id => $rec->{contact_id},
-     domain => $rec->{domainname},
-##     year => $now -> year,
-##     month => $now -> month,
-##     day => $now -> day,
-##     dow => $now -> dow,
-##     dayofyear => $now -> day_of_year,
-##     hour => $now -> hour,
-##     minute => $now -> minute,
-##     second => $now -> second
-    );
-  }
-  return %userinfo;
+sub get_userinfo {
+  my ($self, $data) = @_;
+  my $user = Business::Bof::Data::Fw::fw_user->retrieve(%$data);
+  my @uig = $user->fw_useringroup_user_id;
+  my $group = $uig[0]->usergroup_id;
+  my $db = $group->db_id;
+  my %userinfo = (
+    user_id => $user->user_id,
+    name => $group->name,
+    domain => $group->domainname,
+    dbtype => $db->dbtype,
+    dbname => $db->dbname,
+    dbusername => $db->dbusername,
+    password => $db->dbpassword,
+    dbschema => $db->dbschema,
+    host => $db->dbhost,
+  );
+  return \%userinfo;
 }
 
-# Retrieval
-
-sub findMenus {
-  my $self = shift;
-  my ($menu_id, $usergroup_id) = @_;
-  my $db = $self->{db};
-  my $set = DBIx::Recordset -> Search ({
-    '!DataSource'   => $db,
-    '!Table' => 'fw_menu, fw_menulink',
-    '!TabJoin' => 'fw_menu JOIN fw_menulink
-      ON (fw_menu.menu_id = fw_menulink.child_id)',
-    '$where'  =>  'parent_id = ? AND fw_menu.menu_id NOT IN
-     (SELECT menu_id FROM fw_usermenu WHERE usergroup_id = ?)',
-    '$values'  =>  [$menu_id, $usergroup_id]
-  });
+sub find_menus {
+  my ($self, $menu_id, $usergroup_id) = @_;
+  my @fwmenu = Business::Bof::Data::Fw::fw_menu->search_submenu($menu_id, $usergroup_id);
   my @menu;
-  while (my $rec = $$set -> Next) {
-    push @menu, { ( %$rec ) };
-  }
-  foreach my $rec (@menu) {
-    my @subMenu = $self -> findMenus( $rec -> {menu_id}, $usergroup_id );
-    if (@subMenu) {
-      $rec -> {menu} = [ @subMenu ];
+  for my $fwmenu (@fwmenu) {
+  	my %ml = (name => $fwmenu->name, uri => $fwmenu->uri);
+    my $submenu = $self -> find_menus( $fwmenu->menu_id, $usergroup_id );
+    if (@$submenu) {
+      $ml{menu} = $submenu;
     }
-    $self->{allowed}->{"$rec->{uri}"} = 1;
+    $self->{allowed}->{$fwmenu->uri} = 1 if $fwmenu->uri;
+    push @menu, { ( %ml ) };
   }
-  return @menu;
+  return \@menu;
 }
 
-# getMenu ( {values => %values} )
-sub getMenu {
-  my $self = shift;
-  my $user_id = shift;
-  my $usergroup_id = 0;
+sub get_menu {
+  my ($self, $user_id, $usergroup_id) = @_;
   $self->{allowed} = {};
-  my $db = $self->{db};
-  my $set = DBIx::Recordset -> Search ({
-    '!DataSource'   => $db,
-    '!Table' => 'fw_useringroup',
-    '$where'  =>  'user_id = ?',
-    '$values'  =>  [$user_id]
-  });
-  if (my $rec = $$set -> Next) {
-    $usergroup_id = $rec -> {usergroup_id}
-  }
-  $set = DBIx::Recordset -> Search ({
-    '!DataSource'   => $db,
-    '!Table' => 'fw_menu',
-    '$where'  =>  'menu_id NOT IN (SELECT child_id FROM fw_menulink)
-      AND menu_id NOT IN
-     (SELECT menu_id FROM fw_usermenu WHERE usergroup_id = ?)',
-    '$values'  =>  [$usergroup_id]
-  });
+  my @uig = Business::Bof::Data::Fw::fw_useringroup->search(
+    user_id => $user_id 
+  );
+
+## For now, we only use the first
+  $usergroup_id = $uig[0]->usergroup_id;
+  my @fwmenu = Business::Bof::Data::Fw::fw_menu->topmenu($usergroup_id);
   my @menu;
-  while (my $rec = $$set -> Next) {
-    my @subMenu = $self -> findMenus( $rec -> {menu_id}, $usergroup_id );
-    if (@subMenu) {
-      $rec -> {menu} = [ @subMenu ];
+  for my $fwmenu (@fwmenu) {
+  	my %ml = (name => $fwmenu->name, uri => $fwmenu->uri);
+    my $submenu = $self -> find_menus( $fwmenu->menu_id, $usergroup_id );
+    if (@$submenu) {
+      $ml{menu} = $submenu;
     }
-    $self->{allowed}->{"$rec->{uri}"} = 1 if $rec->{uri};
-    push @menu, { ( %$rec ) };
+    $self->{allowed}->{$fwmenu->uri} = 1 if $fwmenu->uri;
+    push @menu, { ( %ml ) };
   }
-  DBIx::Recordset::Undef ('set');
-  @menu;
+  return \@menu;
 }
 
-sub getServerConfig {
+sub get_serverconfig {
   my ($self, $var) = @_;
   my $res;
   if ($var) {
@@ -183,7 +126,7 @@ sub getServerConfig {
   return $res;
 }
 
-sub getServerSettings {
+sub get_serversettings {
   my ($self, $var) = @_;
   my $res;
   if ($var) {
@@ -194,7 +137,7 @@ sub getServerSettings {
   return $res;
 }
 
-sub getClientSettings {
+sub get_clientsettings {
   my ($self, $var) = @_;
   my $res;
   if ($var) {
@@ -205,13 +148,13 @@ sub getClientSettings {
   return $res;
 }
 
-sub getAllowed {
+sub get_allowed {
   my $self = shift;
-  $self->{allowed}{"notallowed.epl"} = 1;
-  $self->{allowed}{"index.epl"} = 1;
-  $self->{allowed}{"logout.epl"} = 1;
-  $self->{allowed}{"login.epl"} = 1;
-  return %{ $self->{allowed} }
+  $self->{allowed}{"notallowed"} = 1;
+  $self->{allowed}{"index"} = 1;
+  $self->{allowed}{"logout"} = 1;
+  $self->{allowed}{"login"} = 1;
+  return $self->{allowed}
 }
 
 1;
@@ -233,23 +176,15 @@ Fw has these methods:
 
 =over 4
 
-=item getNewSessionid
+=item get_newSessionid
 
 Returns a session ID to be used all throughout the client's session.
-
-=item newFwdb
-
-Returns a new handle to the Framework Database.
-
-=item getFwdb
-
-Returns the current handle to the Framework Database.
 
 =item getdb
 
 Returns a handle to the application's database.
 
-=item getUserinfo
+=item get_userinfo
 
 Returns the User Information from the Framework Database given the login
 information 
@@ -258,27 +193,27 @@ my $data = {
   name => $username,
   password => $password
 }
-my %userinfo = $fw -> getUserinfo( $data );
+my $userinfo = $fw -> getUserinfo( $data );
 
-=item getMenu
+=item get_menu
 
-Returns an array containing the menus from the Framework Database.
+Returns a pointer to an array containing the menus from the Framework Database.
 
 =item getAllowed
 
-Returns an array containing the allowed menu items.
+Returns a pointer to an array containing the allowed menu items.
 
-=item getServerConfig
+=item get_serverconfig
 
 Returns the Server's Configuration (as provided in the configuration XML
 file).
 
-=item getServerSettings
+=item get_serversettings
 
 Returns the Server's Server Settings (as provided in the configuration
 XML file).
 
-=item getClientSettings
+=item get_clientsettings
 
 Returns the Server's Client Settings (as provided in the configuration
 XML file).

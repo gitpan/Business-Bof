@@ -1,9 +1,10 @@
 package Business::Bof::Server::Docprint;
 
 use strict;
-
 use File::stat;
-## use Printer;
+use Printer;
+
+our $VERSION = 0.03;
 
 sub new {
   my ($type, $serverSettings) = @_;
@@ -12,14 +13,14 @@ sub new {
   return bless $self,$type;
 }
 
-sub printFile {
+sub print_file {
   my ($self, $values, $userInfo) = @_;
   $self->{domain} = $userInfo->{domain};
   my $file = $values->{file} if defined($values->{file});
   my $queue = $values->{queue} if defined($values->{queue});
   my $type = $values->{type} || 'print';
- ## my $prn = new Printer();
- ## $prn->use_default;
+  my $prn = new Printer();
+  $prn->use_default;
   my $outDir = "$self->{domdir}/$self->{domain}/doc/";
   my $prnFiles;
   if ($file) {
@@ -35,12 +36,12 @@ sub printFile {
     my $data;
     while (<IN>) {$data .= $_};
     close IN;
-##    $prn->print($data);
-##    rename $inFile, "$outDir/$if->{name}" if lc($type) eq 'print';
+    $prn->print($data);
+    rename $inFile, "$outDir/$if->{name}" if lc($type) eq 'print';
   }
 }
 
-sub getFile {
+sub get_file {
   my ($self, $values, $userInfo) = @_;
   $self->{domain} = $userInfo->{domain};
   my $type = $values->{type} if defined($values->{type});
@@ -55,7 +56,7 @@ sub getFile {
   return $data;
 }
 
-sub getFilelist {
+sub get_filelist {
   my ($self, $values, $userInfo) = @_;
   $self->{domain} = $userInfo->{domain};
   my $type = $values->{type} if defined($values->{type});
@@ -64,7 +65,7 @@ sub getFilelist {
   return $self -> _getFilelist($fileDir);
 }
 
-sub getQueuelist {
+sub get_queuelist {
   my ($self, $values, $userInfo) = @_;
   $self->{domain} = $userInfo->{domain};
   my $type = $values->{type} if defined($values->{type});
@@ -135,7 +136,7 @@ Docprint has four methods:
 
 =over 4
 
-=item printFile
+=item print_file
 
 Prints a file according to the provided data
 
@@ -145,30 +146,30 @@ $data = {
   queue => $queuename
 };
 
-$result = $prt -> printFile($data, $userInfo);
+$result = $prt -> print_file($data, $userInfo);
 
 User applications are expected to print to the doc directory. Docprint
 will find the file there or in the print directory and print it. It will
 move any printed file from the doc to the print directory.
 You can have any number of queues.
 
-=item getFile
+=item get_file
 
 Returns the requested file.
 
-my $result = $prt -> getFile($data, $userInfo);
+my $result = $prt -> get_file($data, $userInfo);
 
-=item getPrintfilelist
+=item get_printfilelist
 
 Returns a list of files in either the doc or the print directory.
 
 my $result = $prt -> getFilelist($data, $userInfo);
 
-=item getQueuelist
+=item get_queuelist
 
 Returns a list of queues in the doc or the print directory.
 
-my $result = $prt -> getQueuelist($data, $userInfo);
+my $result = $prt -> get_queuelist($data, $userInfo);
 
 =back
 
