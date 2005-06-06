@@ -8,7 +8,7 @@ use Digest::MD5 qw(md5_base64);
 
 use Business::Bof::Data::Fw;
 
-our $VERSION = 0.03;
+our $VERSION = 0.05;
 
 sub new {
   my ($type, $conffile) = @_;
@@ -59,6 +59,7 @@ sub getdb {
 sub get_userinfo {
   my ($self, $data) = @_;
   my $user = Business::Bof::Data::Fw::fw_user->retrieve(%$data);
+  return if !defined($user);
   my @uig = $user->fw_useringroup_user_id;
   my $group = $uig[0]->usergroup_id;
   my $db = $group->db_id;

@@ -4,7 +4,7 @@ use strict;
 use File::stat;
 use Printer;
 
-our $VERSION = 0.03;
+our $VERSION = 0.05;
 
 sub new {
   my ($type, $serverSettings) = @_;
@@ -14,42 +14,42 @@ sub new {
 }
 
 sub print_file {
-  my ($self, $values, $userInfo) = @_;
-  $self->{domain} = $userInfo->{domain};
+  my ($self, $values, $userinfo) = @_;
+  $self->{domain} = $userinfo->{domain};
   my $file = $values->{file} if defined($values->{file});
   my $queue = $values->{queue} if defined($values->{queue});
   my $type = $values->{type} || 'print';
   my $prn = new Printer();
   $prn->use_default;
-  my $outDir = "$self->{domdir}/$self->{domain}/doc/";
-  my $prnFiles;
+  my $out_dir = "$self->{domdir}/$self->{domain}/doc/";
+  my $prn_files;
   if ($file) {
-    my $fileDir = "$self->{domdir}/$self->{domain}/$type/$queue/";
-    push @$prnFiles, {name => $file, path => $fileDir}
+    my $file_dir = "$self->{domdir}/$self->{domain}/$type/$queue/";
+    push @$prn_files, {name => $file, path => $file_dir}
   } else {
-    $prnFiles = $self -> getFilelist({type => $type, queue => $queue}, $userInfo);
+    $prn_files = $self -> get_filelist({type => $type, queue => $queue}, $userinfo);
   }
-  for my $if (@$prnFiles) {
+  for my $if (@$prn_files) {
     my $fn = $if->{name};
-    my $inFile = $if->{path} . $if->{name};
-    open IN, $inFile or die("Can't open $inFile\n");
+    my $in_file = $if->{path} . $if->{name};
+    open IN, $in_file or die("Can't open $in_file\n");
     my $data;
     while (<IN>) {$data .= $_};
     close IN;
     $prn->print($data);
-    rename $inFile, "$outDir/$if->{name}" if lc($type) eq 'print';
+    rename $in_file, "$out_dir/$if->{name}" if lc($type) eq 'print';
   }
 }
 
 sub get_file {
-  my ($self, $values, $userInfo) = @_;
-  $self->{domain} = $userInfo->{domain};
+  my ($self, $values, $userinfo) = @_;
+  $self->{domain} = $userinfo->{domain};
   my $type = $values->{type} if defined($values->{type});
   my $queue = $values->{queue} if defined($values->{queue});
   my $file = $values->{file} if defined($values->{file});
-  my $fileDir = "$self->{domdir}/$self->{domain}/$type/$queue/";
-  my $inFile = $fileDir . $file;
-  open IN, $inFile or die("Can't open $inFile\n");
+  my $file_dir = "$self->{domdir}/$self->{domain}/$type/$queue/";
+  my $in_file = $file_dir . $file;
+  open IN, $in_file or die("Can't open $in_file\n");
   my $data;
   while (<IN>) {$data .= $_};
   close IN;
@@ -57,20 +57,20 @@ sub get_file {
 }
 
 sub get_filelist {
-  my ($self, $values, $userInfo) = @_;
-  $self->{domain} = $userInfo->{domain};
+  my ($self, $values, $userinfo) = @_;
+  $self->{domain} = $userinfo->{domain};
   my $type = $values->{type} if defined($values->{type});
   my $queue = $values->{queue} if defined($values->{queue});
-  my $fileDir = "$self->{domdir}/$self->{domain}/$type/$queue/";
-  return $self -> _getFilelist($fileDir);
+  my $file_dir = "$self->{domdir}/$self->{domain}/$type/$queue/";
+  return $self -> _get_filelist($file_dir);
 }
 
 sub get_queuelist {
-  my ($self, $values, $userInfo) = @_;
-  $self->{domain} = $userInfo->{domain};
+  my ($self, $values, $userinfo) = @_;
+  $self->{domain} = $userinfo->{domain};
   my $type = $values->{type} if defined($values->{type});
-  my $qDir = "$self->{domdir}/$self->{domain}/$type/";
-  return $self -> _getQueuelist($qDir);
+  my $q_dir = "$self->{domdir}/$self->{domain}/$type/";
+  return $self -> _get_queuelist($q_dir);
 }
 
 sub fileSort {
@@ -79,7 +79,7 @@ sub fileSort {
   return \@sort;
 }
 
-sub _getFilelist {
+sub _get_filelist {
   my ($self, $dir) = @_;
   my @files;
   opendir(DIR, $dir) || die "can't opendir $dir: $!";
@@ -93,7 +93,7 @@ sub _getFilelist {
   return fileSort(@files);
 }
 
-sub _getQueuelist {
+sub _get_queuelist {
   my ($self, $dir) = @_;
   my @files;
   opendir(DIR, $dir) || die "can't opendir $dir: $!";
@@ -120,7 +120,7 @@ Business::Bof::Server::Docprint -- Handles printing of documents
 
   my $prt = new Business::Bof::Server::Docprint($serverSettings);
 
-  my $result = $prt -> printFile($data, $userInfo);
+  my $result = $prt -> print_file($data, $userinfo);
   ...
 
 =head1 DESCRIPTION
@@ -146,7 +146,7 @@ $data = {
   queue => $queuename
 };
 
-$result = $prt -> print_file($data, $userInfo);
+$result = $prt -> print_file($data, $userinfo);
 
 User applications are expected to print to the doc directory. Docprint
 will find the file there or in the print directory and print it. It will
@@ -157,19 +157,19 @@ You can have any number of queues.
 
 Returns the requested file.
 
-my $result = $prt -> get_file($data, $userInfo);
+my $result = $prt -> get_file($data, $userinfo);
 
 =item get_printfilelist
 
 Returns a list of files in either the doc or the print directory.
 
-my $result = $prt -> getFilelist($data, $userInfo);
+my $result = $prt -> get_filelist($data, $userinfo);
 
 =item get_queuelist
 
 Returns a list of queues in the doc or the print directory.
 
-my $result = $prt -> get_queuelist($data, $userInfo);
+my $result = $prt -> get_queuelist($data, $userinfo);
 
 =back
 

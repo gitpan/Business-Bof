@@ -7,7 +7,7 @@
         <item key="host" >0</item>
         <item key="hostname" >freemoney.org</item>
         <item key="name" >BOFserver</item>
-        <item key="port" >26221</item>
+        <item key="port" >25190</item>
         <item key="serviceName" >bofserver</item>
         <item key="application" >Test</item>
         <item key="timezone" >Europe/Copenhagen</item>

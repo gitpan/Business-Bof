@@ -13,7 +13,7 @@ BEGIN { use_ok('Business::Bof::Client'); };
 
   my $fw = Business::Bof::Client->new({
     server  => 'localhost',
-    port    => 26221,
+    port    => 25190,
     session => 'bofserver'
   });
 
@@ -25,7 +25,7 @@ BEGIN { use_ok('Business::Bof::Client'); };
   my ($client_data, $cache_data, $cm_data);
   ok($client_data = $fw->get_clientdata(), 'Get clientdata');
 
-  is($fw->cache_data('bof', $client_data), '', 'Cache clientdata');
+  is($fw->cache_data('bof', $client_data), undef, 'Cache clientdata');
   ok($cache_data = $fw->get_cachedata('bof'), 'Get cached data');
   ok(eq_hash($client_data, $cache_data), 'Compare cached data');
 

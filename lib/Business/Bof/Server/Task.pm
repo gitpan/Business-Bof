@@ -6,7 +6,7 @@ use XML::Dumper;
 
 use Business::Bof::Data::Fw;
 
-our $VERSION = 0.02;
+our $VERSION = 0.05;
 
 sub new {
   my ($type) = @_;
@@ -14,7 +14,7 @@ sub new {
   return bless $self,$type;
 }
 
-sub newTask {
+sub new_task {
   my ($self, $values) = @_;
   my $parms;
   if (defined $values->{data}) {
@@ -33,7 +33,7 @@ sub newTask {
   my $task_id = $fwtask->task_id;
 }
 
-sub updTask {
+sub upd_task {
   my ($self, $values) = @_;
   my $fwtask = Business::Bof::Data::Fw::fw_task->retrieve($values->{task_id});
   $values->{parameters} = pl2xml($values->{data}) if defined $values->{data};
@@ -43,7 +43,7 @@ sub updTask {
   $fwtask->dbi_commit();
 }
 
-sub getTask {
+sub get_task {
   my ($self, $values) = @_;
   my $ro = $values->{ro};
   delete $values->{ro};
@@ -61,7 +61,7 @@ sub getTask {
   return $fwtask;
 }
 
-sub getTasklist {
+sub get_tasklist {
   my ($self, $userInfo) = @_;
   my $db = $self->{db};
   my @task = Business::Bof::Data::Fw::fw_task->search(

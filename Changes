@@ -1,4 +1,18 @@
-2005-05-31   Kaare Rasmussen <kar at kakidata dot dk>
+2005-06-06   Kaare Rasmussen <kar at kakidata dot dk>
+
+    Release 0.05
+
+    CVS export of 0.04 was wrong, giving a nonfunctional tarball.
+
+    Release 0.04
+
+    Found and corrected following bugs w/ROE:
+    - Return of arrays
+    - Cloned objects
+    - All calls are now eval'd. The serve will not break because of
+      typos.
+    Started work to get tasks back into Bof.
+    Re-added support for logging.
 
     Release 0.03
 

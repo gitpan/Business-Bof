@@ -14,8 +14,8 @@ use Business::Bof::Server::Task;
 use Business::Bof::Server::Schedule;
 use Business::Bof::Server::Docprint;
 
-our ($fw, $fwtask);
-our $VERSION = 0.03;
+our ($fw, $fwtask, $logger);
+our $VERSION = 0.05;
 
 sub set_fw {
   $fw = shift;
@@ -36,9 +36,10 @@ sub login {
     Business::Bof::Server::Session::set_menu($session_id, $menu);
     Business::Bof::Server::Session::set_allowed($session_id, $fw->get_allowed());
     Business::Bof::Server::Session::set_db($session_id, $fw->getdb({ userinfo => $userinfo }));
-##Log
-#   $logger->info("Login user $log_info->{name}, session $session_id");
-   return $session_id;
+    my $appenders = Log::Log4perl->appenders();
+    $logger = get_logger("Bof") if %$appenders;
+    $logger->info("Login user $log_info->{name}, session $session_id") if defined($logger);
+    return $session_id;
   } else {
     return 0
   }
@@ -47,8 +48,7 @@ sub login {
 sub logout {
   my $session_id = shift;
   Business::Bof::Server::Session::remove_session($session_id);
-#Log
-#  $logger->info("Removed session $session_id");
+  $logger->info("Removed session $session_id") if defined($logger);
   return 0;
 }
 
@@ -131,10 +131,10 @@ sub print_file {
   my ($session_id, $data) = @_;
   my $result;
   if (Business::Bof::Server::Session::defined_session($session_id)) {
-    my $serverSettings = $fw->getServerSettings();
+    my $serverSettings = $fw->get_serversettings();
     my $fwprint = new Business::Bof::Server::Docprint($serverSettings);
     my $userinfo =  Business::Bof::Server::Session::get_userinfo($session_id);
-    $result = $fwprint -> printFile($data, $userinfo);
+    $result = $fwprint -> print_file($data, $userinfo);
   } else {
     $result = "No session";
   }
@@ -192,9 +192,12 @@ sub call_method {
   my $class = $parms{class};
   my $method = $parms{method};
   my $serversettings = $fw->get_serversettings();
-  my $module = instantiate($class, $db, $serversettings);
-  my $res = $module->$method($parms{data}, $userinfo);
-##  $logger->info("Method call: $class\:\:$method for $domain");
+  $logger->debug("Method call: $class\:\:$method for $domain") if defined($logger);
+  my $res;
+  eval { my $module = instantiate($class, $db, $serversettings);
+    $res = $module->$method($parms{data}, $userinfo)
+  };
+  $logger->error('error', $@) if $@ && defined($logger);
   return $res;
 }
 

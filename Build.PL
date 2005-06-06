@@ -1,9 +1,10 @@
 use Module::Build;
 my $build = Module::Build->new (
   module_name => 'Business::Bof',
+  dist_name => 'Business::Bof',
   dist_author => 'Kaare Rasmussen <kar at kakidata.dk>',
-  dist_abstract => 'A Framework for Business Oriented Tasks',
-  dist_version => '0.03',
+  dist_abstract => 'Application Server featuring User Control and Remote Object Execution',
+  dist_version => '0.05',
   license => 'perl',
   requires => {
     'perl'                         => '5.8.3',

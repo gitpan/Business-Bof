@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 6;
+use Test::More tests => 7;
 
 use lib './lib';
 
@@ -11,21 +11,25 @@ BEGIN { use_ok('Business::Bof::Server::Fw'); };
 
   ok(defined $fw, 'Defined Fw');
   ok($fw->isa('Business::Bof::Server::Fw'), 'Object type');
-  ok($fw->getNewSessionid(), 'Get new Session ID');
+  ok($fw->get_newsessionid(), 'Get new Session ID');
+
+  my $wui = $fw->get_userinfo({name=>'test', password=>'bof'});
+  is($wui, undef, 'Wrong userinformation');
   my %key = (
     name     => 'bof',
     password => 'test'
   );
   my %exp_ui = (
-    dbschema => 'test',
-    name => 'bof',
-    host => 'localhost',
-    dbname => 'test',
-    domain => 'bof',
-    password => '',
-    dbtype => 'Pg',
-    dbusername => '',
-    user_id => '1'
+    'dbschema' => '',
+    'name' => 'bof',
+    'host' => 'localhost',
+    'dbname' => 't/test.sqlite',
+    'domain' => 'bof',
+    'password' => '',
+    'dbtype' => 'SQLite',
+    'dbusername' => '',
+    'user_id' => '1'
+
   );
   my $ui = $fw->get_userinfo(\%key);
   ok(eq_hash(\%exp_ui, $ui), 'Get Userinfo');

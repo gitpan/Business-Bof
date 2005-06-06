@@ -7,12 +7,10 @@ use DateTime;
 use Exporter ();
 use Getopt::Std;
 use Log::Log4perl qw(get_logger :levels);
-# Log statements indicated
 use POE qw(Session Wheel::Run Filter::Reference);
 use POE::Component::Server::SOAP;
 use Scalar::Util qw(blessed refaddr);
 use Switch;
-##use XML::Dumper;
 
 ## Debug purpose only:
 use Data::Dumper;
@@ -25,11 +23,11 @@ use Business::Bof::Server::Schedule;
 use Business::Bof::Server::Session;
 use Business::Bof::Server::Connection;
 
-our $VERSION = 0.03;
+our $VERSION = 0.05;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(run);
 
-our ($conffile, $fw, $fwtask, $expire_after, $tz, $logger);
+our ($conffile, $fw, $fwtask, $expire_after, $tz, $obj_seq, $logger);
 
 sub init {
   $fw = new Business::Bof::Server::Fw($conffile);
@@ -44,6 +42,7 @@ sub init {
   }
 }
 
+
 sub _process_conf {
   my $conf = shift;
   $tz = $conf->{timezone};
@@ -57,10 +56,8 @@ sub _start_logger {
   my $conf = shift;
   my $log_conf = "$conf->{home}/etc/log.conf";
   return unless -r $log_conf;
-  $logger = get_logger("Server");
-  Log::Log4perl->init_and_watch(
-    "$conf->{home}/etc/log.conf",
-    $conf->{logCheck}); # Check conf every x seconds
+  Log::Log4perl->init_and_watch($log_conf, $conf->{logCheck});
+  $logger = get_logger("Bof");
   $logger->info("Started $conf->{application} Server");
 }
 
@@ -125,15 +122,16 @@ sub setup_service {
   $kernel->post($name, 'ADDMETHOD', $serviceName, 'execMethod');
   $kernel->delay('houseKeeping', $fw -> get_serverconfig("housekeepingDelay"));
   $kernel->delay('handleTasks', $fw -> get_serverconfig("taskDelay")) if $fwtask;
-  print "\n$application Server is running on PID $$\n";
-# Log
+  my $logtext = "$application Server is running on PID $$";
+  $logger->info($logtext) if defined($logger);
+  print "\n$logtext\n";
 }
 
 sub shutdown_service {
   my $name = $fw -> get_serverconfig("name");
   my $serviceName = $fw -> get_serverconfig("serviceName");
   $_[KERNEL]->post( $name, 'DELSERVICE', $serviceName );
-# Log
+  $logger->info("Server shutting down") if defined($logger);
 }
 
 sub houseKeeping {
@@ -180,13 +178,13 @@ sub setup_class {
   my $session_id = $params->{sessionId};
   my $data = $params->{data};
   my $module = $data->{class};
+  $logger->info("setup class $module") if defined($logger);
   eval "require $module";
   my $package = $data->{package};
   push @$package, $module;
   my $result = get_allowed_methods(@$package);
   $response->content( $result );
   $_[KERNEL]->post( $name, 'DONE', $response );
-# Log
 }
 
 sub get_allowed_methods {
@@ -209,6 +207,7 @@ sub _search_isa {
   no strict qw/refs/;
   foreach my $entry (keys %{"${in_pkg}::"}) {
     $subs{$entry} = 1 if *{"${in_pkg}::${entry}"}{CODE};
+    $logger->debug("class $in_pkg method: $entry") if defined($logger);
   }
   foreach my $pkg (@{"${in_pkg}::ISA"}) {
     %subs = _search_isa($pkg, %subs);
@@ -228,10 +227,13 @@ sub exec_method {
   my @parms = @$parms;
   my $obj_id;
   $obj_id = proxy_object($session_id, \@parms);
-# Log
+  my $logtext = "class $class method $method";
+  $logtext .= " Session $session_id" if $session_id; 
+  $logtext .= " obj_id $obj_id" if $obj_id;
+  $logger->debug($logtext) if defined($logger);
   my @result = $obj_id ? _instance_method($session_id, $obj_id, $method, @parms) : 
     _class_method($session_id, $class, $method, @parms);
-  $response->content( @result );
+  $response->content( \@result );
   $_[KERNEL]->post( $name, 'DONE', $response );
 }
 
@@ -242,7 +244,7 @@ sub _instance_method {
     Business::Bof::Server::Session::delete_object($session_id, $obj_id);
   } else {
     my $obj = shift @parms;
-    @result = $obj->$method(@parms);
+    eval { @result = $obj->$method(@parms) };
     object_proxy($session_id, \@result);
   }
   return @result;
@@ -254,10 +256,10 @@ sub _class_method {
   no strict qw/refs/;
   if ($class eq $parms[0]) {
     shift @parms;
-    @result = $class->$method(@parms);
+    eval { @result = $class->$method(@parms) };
   } else {
     my $fqm = "$class\:\:$method";
-    @result = &{ $fqm }(@parms);
+    eval {@result = &{ $fqm }(@parms) };
   }
   object_proxy($session_id, \@result);
   return @result;
@@ -281,7 +283,7 @@ sub object_proxy {
   my ($session_id, $parms) = @_;
    for my $p (@$parms) {
      if (blessed($p)) {
-       my $obj_id = refaddr($p);
+       my $obj_id = ++$obj_seq;
        Business::Bof::Server::Session::set_object($session_id, $obj_id, $p);
        my $prox = "__bof__" . $obj_id;
        my $class = ref($p);

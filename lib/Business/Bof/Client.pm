@@ -5,7 +5,7 @@ use strict;
 use Scalar::Util qw(blessed refaddr);
 use SOAP::Lite;
 
-our $VERSION = 0.03;
+our $VERSION = 0.05;
 
 sub new {
   my ($type, $params) = @_;
@@ -18,7 +18,19 @@ sub new {
   $self->{remote} = $remote;
   my $class = bless $self,$type;
   my $res = $class->setup_class('Business::Bof::Server::Connection');
+  _setup_methods();
   return $class;
+}
+
+sub _setup_methods {
+  no strict qw/refs/;
+  foreach my $meth (qw/get_clientdata get_data cache_data get_cachedata get_task
+    get_tasklist print_file get_printfile get_printfilelist get_queuelist call_method/) {
+    *{__PACKAGE__."::${meth}"} = sub {
+      my $self = shift;
+      &{"Business::Bof::Server::Connection::${meth}"}($self->{session_id}, @_);
+    };
+  }
 }
 
 sub disconnect {
@@ -45,72 +57,6 @@ sub set_sessionid {
   my ($self, $session_id) = @_;
   $self->{session_id} = $session_id;
   $self->{SOAPsessionId} = SOAP::Data->name(sessionId => $session_id);
-}
-
-sub get_clientdata {
-  my $self = shift;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_clientdata($session_id);
-}
-
-sub get_data {
-  my ($self, $parms) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_data($session_id, $parms);
-}
-
-sub cache_data {
-  my ($self, $name, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::cache_data($session_id, $name, $data);
-}
-
-sub get_cachedata {
-  my ($self, $name) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_cachedata($session_id, $name);
-}
-
-sub get_task {
-  my ($self, $task_id) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_task($session_id, $task_id);
-}
-
-sub get_tasklist {
-  my $self = shift;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_tasklist($session_id);
-}
-
-sub print_file {
-  my ($self, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::print_file($session_id, $data);
-}
-
-sub get_printfile {
-  my ($self, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_printfile($session_id, $data);
-}
-
-sub get_printfilelist {
-  my ($self, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_printfilelist($session_id, $data);
-}
-
-sub get_queuelist {
-  my ($self, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::get_queuelist($session_id, $data);
-}
-
-sub call_method {
-  my ($self, $data) = @_;
-  my $session_id = $self->{session_id};
-  Business::Bof::Server::Connection::call_method($session_id, $data);
 }
 
 sub setup_class {
@@ -152,13 +98,21 @@ sub _soap_dispatch {
   my $method = SOAP::Data->name(method => {class => $class, method => $meth});
   my $SOAPparms = SOAP::Data->name(parms => \@parms);
   my $res = $remote->execMethod($session_id,$method,$SOAPparms)->result;
-  if (ref($res) eq 'ARRAY' && ${$res}[0] =~ /__bof__/) {
-    my $h = {obj => $res};
-    my $cl = ${$res}[1];
-    bless $h, $cl;
-    $res = $h;
+  object_proxy($res);
+  return undef if $#$res == -1;
+  $res = shift @$res if !$#$res;
+  return wantarray && ref($res) eq 'ARRAY' ? @$res : $res;
+}
+
+sub object_proxy {
+  foreach my $elm (@{ $_[0] }) {
+    if (ref($elm) eq 'ARRAY' && ${$elm}[0] =~ /__bof__/) {
+      my $h = {obj => $elm};
+      my $cl = ${$elm}[1];
+      bless $h, $cl;
+      $elm = $h;
+    }
   }
-  return $res;
 }
 
 1;

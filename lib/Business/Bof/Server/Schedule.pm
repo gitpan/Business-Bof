@@ -7,7 +7,7 @@ use XML::Dumper;
 use Business::Bof::Server::Task;
 use Business::Bof::Data::Fw;
 
-our $VERSION = 0.02;
+our $VERSION = 0.05;
 
 sub new {
   my ($type) = @_;
